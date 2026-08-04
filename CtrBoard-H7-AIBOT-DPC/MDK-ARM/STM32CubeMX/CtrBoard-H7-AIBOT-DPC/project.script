@@ -1,0 +1,5 @@
+load STM32H723VGTx
+project name STM32CubeMX
+project toolchain "MDK-ARM V5"
+project path "D:\Internship\TsingHuaSZ-AI-Robot-LAB\CtrBoard-H7-AIBOT-DPC\CtrBoard-H7-AIBOT-DPC\MDK-ARM\STM32CubeMX\CtrBoard-H7-AIBOT-DPC"
+SetCopyLibrary "copy only"

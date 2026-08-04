@@ -1,0 +1,5 @@
+load STM32H723VGTx
+project name STM32CubeMX
+project toolchain "MDK-ARM V5"
+project path "D:\Internship\TsingHuaSZ-AI-Robot-LAB\4WIS4WID\TsingHuaSZ-AIRobot-SteeringWheel\MDK-ARM\STM32CubeMX\CtrBoard-H7-AIBOT-DPD"
+SetCopyLibrary "copy only"

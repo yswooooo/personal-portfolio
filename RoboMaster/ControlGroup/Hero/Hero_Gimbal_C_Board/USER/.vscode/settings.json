@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "judge_rx_data.h": "c",
+        "string.h": "c",
+        "judge_tx_data.h": "c",
+        "pc_rx_data.h": "c",
+        "modeswitch_task.h": "c",
+        "stm32_tim_base.h": "c",
+        "pid.h": "c"
+    },
+    "workbench.tree.enableStickyScroll": true
+}

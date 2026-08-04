@@ -1,0 +1,184 @@
+*** Using Compiler 'V6.16', folder: 'D:\Keil_v5\ARM\ARMCLANG\Bin'
+Build target 'CtrBoard-H7-AIBOT-DPD'
+compiling usart.c...
+compiling app_kinematics.c...
+compiling app_led_indicator.c...
+compiling stm32h7xx_it.c...
+compiling app_ld2rs_task.c...
+compiling gpio.c...
+compiling app_serial_ctrl.c...
+compiling bsp_rs485_bus2.c...
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23591): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+#define IS_DMA_STREAM_INSTANCE(INSTANCE) (((INSTANCE) == DMA1_Stream0)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23592): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA1_Stream1)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23593): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA1_Stream2)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23594): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA1_Stream3)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23595): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA1_Stream4)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23596): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA1_Stream5)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23597): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA1_Stream6)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23598): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA1_Stream7)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23599): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA2_Stream0)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23600): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA2_Stream1)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23601): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA2_Stream2)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23602): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA2_Stream3)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23603): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA2_Stream4)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23604): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA2_Stream5)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23605): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA2_Stream6)   || \
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1165): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+#define __HAL_DMA_GET_COUNTER(__HANDLE__) ((IS_DMA_STREAM_INSTANCE((__HANDLE__)->Instance))? \
+                                            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+../Drivers/CMSIS/Device/ST/STM32H7xx/Include/stm32h723xx.h(23606): note: expanded from macro 'IS_DMA_STREAM_INSTANCE'
+                                          ((INSTANCE) == DMA2_Stream7))
+                                            ^~~~~~~~
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1166): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+                                           (((DMA_Stream_TypeDef *)(__HANDLE__)->Instance)->NDTR) :\
+                                                                   ~~~~~~~~~~~~^
+../BSP/Src/bsp_rc.c(83): error: member reference type 'DMA_HandleTypeDef' (aka 'struct __DMA_HandleTypeDef') is not a pointer; did you mean to use '.'?
+    uint32_t ndtr = __HAL_DMA_GET_COUNTER(hdma_uart5_rx);
+                    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../Drivers/STM32H7xx_HAL_Driver/Inc\stm32h7xx_hal_dma.h(1167): note: expanded from macro '__HAL_DMA_GET_COUNTER'
+                                           (((BDMA_Channel_TypeDef *)(__HANDLE__)->Instance)->CNDTR))
+                                                                     ~~~~~~~~~~~~^
+18 errors generated.
+compiling bsp_rc.c...
+compiling bsp_vofa.c...
+compiling app_wheel_task.c...
+compiling app_chassis_motor_ctrl.c...
+compiling app_steer_chassis.c...
+../App/Src/app_rc.c(188): warning: passing 'volatile uint8_t *' (aka 'volatile unsigned char *') to parameter of type 'const uint8_t *' (aka 'const unsigned char *') discards qualifiers [-Wincompatible-pointer-types-discards-qualifiers]
+        if (bsp_sbus_parse_frame(&g_rc_dma_buffer[bsp_rc_get_frame_offset(frame_len)], raw_channels)) {
+                                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+../BSP/Inc\bsp_rc.h(36): note: passing argument to parameter 'data' here
+uint8_t  bsp_sbus_parse_frame(const uint8_t *data, uint16_t channels[16]);
+                                             ^
+1 warning generated.
+compiling app_rc.c...
+compiling main.c...
+"CtrBoard-H7-AIBOT-DPD\CtrBoard-H7-AIBOT-DPD.axf" - 18 Error(s), 1 Warning(s).
+Target not created.
+Build Time Elapsed:  00:00:05

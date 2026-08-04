@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "modeswitch_task.h": "c",
+        "keyboard.h": "c",
+        "stdlib.h": "c",
+        "judge_tx_data.h": "c",
+        "judge_rx_data.h": "c",
+        "pid.h": "c",
+        "fuzzy_pid.h": "c"
+    },
+    "workbench.tree.enableStickyScroll": true
+}

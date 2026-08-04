@@ -1,0 +1,28 @@
+{
+    "files.associations": {
+        "usb_dcd_int.h": "c",
+        "bsp_usb.h": "c",
+        "stm32f4xx.h": "c",
+        "st_usb_cdc.h": "c",
+        "kalman_filter.h": "c",
+        "gimbal_task.h": "c",
+        "task.h": "c",
+        "comm_task.h": "c",
+        "bmi088driver.h": "c",
+        "ahrs.h": "c",
+        "detect_task.h": "c",
+        "filters.h": "c",
+        "mahonyahrs.h": "c",
+        "bsp_dwt.h": "c",
+        "dma.h": "c",
+        "delay.h": "c",
+        "bsp_can.h": "c",
+        "pid.h": "c",
+        "sys_config.h": "c",
+        "math.h": "c",
+        "freertosconfig.h": "c",
+        "freertos.h": "c",
+        "ladrc.h": "c"
+    },
+  
+}
