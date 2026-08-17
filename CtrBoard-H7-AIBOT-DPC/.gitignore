@@ -40,3 +40,6 @@ tools/gcc/build/
 
 # GCC Makefile build artifacts
 build/
+MDK-ARM/CtrBoard-H7-AIBOT-DPC.uvoptx
+MDK-ARM/CtrBoard-H7-AIBOT-DPC/CtrBoard-H7-AIBOT-DPC.axf
+MDK-ARM/CtrBoard-H7-AIBOT-DPC/CtrBoard-H7-AIBOT-DPC.hex

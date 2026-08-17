@@ -36,11 +36,27 @@
 #include "app_led_indicator.h"
 #include "arm_math.h"
 #include "bsp_dwt.h"
+#include <float.h>
+#include <stdint.h>
 
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+
+typedef struct
+{
+  int8_t int8_value;
+  uint8_t uint8_value;
+  int16_t int16_value;
+  uint16_t uint16_value;
+  int32_t int32_value;
+  uint32_t uint32_value;
+  int64_t int64_value;
+  uint64_t uint64_value;
+  float float_value;
+  double double_value;
+} numeric_max_increment_test_t;
 
 /* USER CODE END PTD */
 
@@ -58,7 +74,19 @@
 
 /* USER CODE BEGIN PV */
 
-
+volatile numeric_max_increment_test_t g_numeric_max_increment_test =
+{
+  .int8_value = INT8_MAX,
+  .uint8_value = UINT8_MAX,
+  .int16_value = INT16_MAX,
+  .uint16_value = UINT16_MAX,
+  .int32_value = INT32_MAX,
+  .uint32_value = UINT32_MAX,
+  .int64_value = INT64_MAX,
+  .uint64_value = UINT64_MAX,
+  .float_value = FLT_MAX,
+  .double_value = DBL_MAX
+};
 
 /* USER CODE END PV */
 
@@ -82,6 +110,7 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 //  float32_t sine = arm_sin_f32(12);
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -158,6 +187,17 @@ int main(void)
 
   /* WS4810 LED 状态指示 */
   app_led_indicator_init();
+	
+	g_numeric_max_increment_test.int8_value++;
+  g_numeric_max_increment_test.uint8_value++;
+  g_numeric_max_increment_test.int16_value++;
+  g_numeric_max_increment_test.uint16_value++;
+  g_numeric_max_increment_test.int32_value++;
+  g_numeric_max_increment_test.uint32_value++;
+  g_numeric_max_increment_test.int64_value++;
+  g_numeric_max_increment_test.uint64_value++;
+  g_numeric_max_increment_test.float_value++;
+  g_numeric_max_increment_test.double_value++;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -252,9 +292,11 @@ static void App_Vofa_UpperDisplay(void)
     /* VOFA+ JustFloat 发送: 每 APP_VOFA_JUSTFLOAT_PERIOD_MS 一帧 */
   {
       static uint32_t s_u32LastVofaTick = 0u;
+
       uint32_t now_tick = HAL_GetTick();
       if ((now_tick - s_u32LastVofaTick) >= APP_VOFA_JUSTFLOAT_PERIOD_MS) {
-          float vofa_channels[19] = {
+
+          float vofa_channels[23] = {
               (float)g_vofa_speed.m1_ref_speed_rpm,          /* CH01 */
               (float)g_vofa_speed.m1_feedback_speed_rpm,     /* CH02 */
 
@@ -282,8 +324,12 @@ static void App_Vofa_UpperDisplay(void)
 							(float)g_vofa_speed.m1_encoder_position_counts,
 							(float)g_vofa_speed.m2_encoder_position_counts,
 
+              (float)g_vofa_speed.m1_encoder_estimated_speed_rpm, /* CH20 */
+              (float)g_vofa_speed.m2_encoder_estimated_speed_rpm, /* CH21 */
+              (float)g_vofa_speed.est_error_m1_rpm,          /* CH22 */
+              (float)g_vofa_speed.est_error_m2_rpm           /* CH23 */
           };
-          bsp_vofa_just_float(vofa_channels, 19);
+          bsp_vofa_just_float(vofa_channels, 23);
           s_u32LastVofaTick = now_tick;
       }
   }

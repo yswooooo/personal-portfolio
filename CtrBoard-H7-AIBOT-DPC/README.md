@@ -4,7 +4,7 @@ CtrBoard-H7-AIBOT-DPC 是基于 STM32H723VGTx 的双 LD2-RS 伺服差速底盘�
 
 ```text
 SBUS 遥控 -> 一阶低通/死区 -> 差速解算 -> USART3 RS485 Modbus RTU -> LD2-RS M1/M2
-                                      \-> USART1 VOFA+ JustFloat 17 通道监测
+                                      \-> USART1 VOFA+ JustFloat 23 通道监测
 ```
 
 > 主开发、调试、烧录仍使用 Keil MDK-ARM；根目录 `Makefile` 用于 GCC 命令行编译验证和产物生成。
@@ -24,15 +24,17 @@ SBUS 遥控 -> 一阶低通/死区 -> 差速解算 -> USART3 RS485 Modbus RTU ->
 | SBUS 遥控 | UART5 | PB13 TX / PD2 RX | 100000 8E2 | DMA+IDLE，硬件反相 |
 | WS4810 LED | SPI6 | CubeMX 配置 | SPI 模拟时序 | 系统状态灯 |
 | 急停按键 | GPIO | CubeMX 配置 | EXTI | 1=停机 |
+| DWT时间戳 | Cortex-M7内核 | 无 | 480 MHz，1 us换算 | RS485有效反馈采样时刻 |
+| 调试定时 | TIM6 | 无 | 1 ms中断 | 观察DWT ms/us时间戳 |
 
 ---
 
 ## 2. 软件架构
 
 ```text
-Core/           CubeMX 生成和主循环入口
-App/            应用层：电机初始化、差速解算、FSM 调度、安全策略、LED 状态
-BSP/            硬件抽象：RS485、SBUS、VOFA、WS4810
+Core/           CubeMX 生成和主循环入口，包含TIM6 1 ms调试定时
+App/            应用层：电机初始化、差速解算、FSM调度、编码器估速、安全策略、LED状态
+BSP/            硬件抽象：DWT、RS485、SBUS、VOFA、WS4810
 Middleware/     协议/算法：低通滤波、Modbus RTU、LD2-RS 寄存器封装
 Drivers/        STM32H7 HAL + CMSIS
 DSP/            本地 CMSIS-DSP 源码
@@ -54,12 +56,12 @@ Middleware -> BSP -> App -> Core
 
 `Core/Src/main.c` 初始化顺序：
 
-1. HAL、时钟、GPIO/DMA/USART/SPI 初始化。
-2. 初始化 RS485 总线和 M1/M2 LD2-RS 设备句柄。
-3. 等待 `APP_SYSTEM_START_DELAY_MS = 200` ms。
-4. 阻塞配置驱动器：速度模式、零速、内部速度源、加减速、PI 参数。
-5. 启动 UART5 SBUS DMA+IDLE。
-6. 初始化非阻塞电机 FSM 和 WS4810 状态灯。
+1. HAL、时钟、GPIO/DMA/USART/SPI/TIM6初始化。
+2. 初始化480 MHz DWT周期计数器，并启动TIM6 1 ms调试中断。
+3. 初始化RS485总线和M1/M2 LD2-RS设备句柄。
+4. 阻塞配置驱动器：速度模式、零速、内部速度源、加减速和PI参数。
+5. 启动UART5 SBUS DMA+IDLE。
+6. 初始化非阻塞电机FSM和WS4810状态灯。
 7. `while(1)` 中循环调用：
 
 ```c
@@ -67,6 +69,8 @@ app_ld2rs_task_run();
 App_Vofa_UpperDisplay();
 app_led_indicator_update();
 ```
+
+`APP_SYSTEM_START_DELAY_MS = 200`仍保留为配置宏，但对应 `HAL_Delay()` 当前已在 `main.c` 中注释。TIM6回调用于观察1 ms计数和DWT时间戳；编码器速度估算使用RS485接收完成时记录的DWT微秒时间，而不是TIM6周期。
 
 ---
 
@@ -96,14 +100,22 @@ app_led_indicator_update();
 IDLE -> READ_REQ -> WAIT_READ -> READ_DONE -> WRITE_REQ -> WAIT_WRITE -> WRITE_DONE -> IDLE
 ```
 
-- READ：读 `PrB.05` 状态和 `PrB.06` 实时速度。
+- READ分为两个子事务：先读 `PrB.05/PrB.06` 状态与未滤波转速，再读 `PrB.24` 高低16位编码器累计位置。
 - WRITE：写 `Pr3.04` 目标速度。
 - BSP 物理层最多重试 3 次，APP FSM 逻辑层读/写各最多重试 3 次。
-- READ 重试耗尽后会强制写零速。
+- 状态/速度读取重试耗尽后会强制写零速；编码器读取重试耗尽只放弃本轮观测并保留旧样本。
+
+共享总线的轮询顺序为：
+
+```text
+M1 状态/速度 -> M2 状态/速度
+-> M1 编码器 -> M2 编码器
+-> M1 写速度 -> M2 写速度
+```
 
 ### 编码器速度估算
 
-- FSM 阶段性读取单寄存器 `PrB.24` 的位置反馈。回传值合并为 `int32_t`，它是电机侧（转子侧）的有符号 32 位累计位置值，不是减速器输出轴位置。
+- FSM阶段性读取 `PrB.24` 位置反馈对应的高、低两个16位寄存器。回传值合并为 `int32_t`，它是电机侧（转子侧）的有符号32位累计位置值，不是减速器输出轴位置。
 - 当前 M17 默认使用 17 位磁编码器：转子一圈为 `131072` 个 encoder counts（单圈编码可表示 `0..131071`）。未转动上电后，`PrB.24` 的累计值可从 0 开始。
 - 仅在相邻两次有效 `PrB.24` 反馈之间估算速度。RS485 接收完成时记录 DWT 微秒时间戳，使用 `delta_counts / delta_time_us` 求计数速度；首次有效样本只用于建立基准，不输出速度。
 - 编码器方向由 `APP_LD2_ENCODER_POLARITY_M1/M2` 独立修正。`int32_t` 累计位置跨越有符号边界时，差分按 32 位回绕处理，不按 17 位单圈编码范围回绕。
@@ -115,13 +127,15 @@ wheel_speed_rpm = motor_speed_rpm / 20
 wheel_speed_mps = wheel_speed_rpm × 2π × 0.075 / 60
 ```
 
-估算结果通过 `app_ld2rs_task_get_speed_feedback()` 提供，分别为电机侧转速（rpm）、减速后轮毂转速（rpm）和轮毂线速度（m/s）。VOFA+ 的 CH18、CH19 输出 M1、M2 的 `PrB.24` 累计位置，便于与估算结果交叉核对。
+估算结果通过 `app_ld2rs_task_get_speed_feedback()` 提供，分别为电机侧转速（rpm）、减速后轮毂转速（rpm）和轮毂线速度（m/s）。VOFA+ 的 CH18、CH19 输出 M1、M2 的 `PrB.24` 累计位置；CH20、CH21 输出 M1、M2 的 DWT 编码器估算电机转速，可分别与 CH2、CH4 的 `PrB.06` 未滤波转速对比；CH22、CH23 输出两台电机对应的估算误差字段。
+
+> 注意：当前 `est_error_m1_rpm`、`est_error_m2_rpm` 已加入 VOFA 发送数组，但尚未在应用任务中计算赋值，因此上电初始化后会保持为 0。需要观测真实误差时，应先明确误差方向并在速度发布处赋值。
 
 ---
 
 ## 5. VOFA+ 监测
 
-当前实际发送 **19 个 JustFloat 通道**，周期 20 ms：
+当前实际发送 **23 个 JustFloat 通道**，周期 20 ms：
 
 | CH | 数据 |
 |----|------|
@@ -134,6 +148,8 @@ wheel_speed_mps = wheel_speed_rpm × 2π × 0.075 / 60
 | 14~15 | 底盘线速度 / 角速度指令 |
 | 16~17 | M1/M2 闭环周期 |
 | 18~19 | M1/M2 `PrB.24` 编码器累计位置值 |
+| 20~21 | M1/M2 DWT 编码器估算电机转速（rpm） |
+| 22~23 | M1/M2 编码器估算误差字段（rpm，当前尚未计算赋值） |
 
 ---
 
@@ -187,6 +203,7 @@ Makefile 当前已匹配工程中的 `Core/App/BSP/Middleware/Drivers` 源文件
 | 宏 | 当前值 | 说明 |
 |----|--------|------|
 | `APP_LD2_MOTOR_SLAVE_ID_M1/M2` | 1 / 2 | 驱动器站号 |
+| `APP_LD2_MOTOR_COUNT/MAX_COUNT` | 2 / 3 | 当前轮询数量/调度器容量 |
 | `APP_LD2_MOTOR_TIMEOUT_MS` | 100 | Modbus 超时 |
 | `APP_LD2_MOTOR_OFFLINE_CONFIRM_COUNT` | 3 | 离线确认阈值 |
 | `APP_MODBUS_RTU_INTERFRAME_MS` | 1 | 帧间隔 |
@@ -197,6 +214,8 @@ Makefile 当前已匹配工程中的 `Core/App/BSP/Middleware/Drivers` 源文件
 | `APP_LD2_ENCODER_BITS` | 17 | M17 磁编码器位数 |
 | `LD2_ENCODER_COUNTS_PER_REV` | 131072.0 | 电机侧每圈编码器计数 |
 | `APP_LD2_ENCODER_POLARITY_M1/M2` | 1 / 1 | 编码器速度正方向修正 |
+| `APP_SYSTEM_START_DELAY_MS` | 200 | 当前 `HAL_Delay()` 已注释 |
+| `APP_VOFA_JUSTFLOAT_PERIOD_MS` | 20 | 23通道发送周期 |
 | `BSP_RC_STICK_DEADZONE` | 150.0 | 摇杆死区 |
 | `BSP_RC_LPF_TAU_MS` | 200.0 | RC 低通时间常数 |
 
@@ -212,4 +231,6 @@ Makefile 当前已匹配工程中的 `Core/App/BSP/Middleware/Drivers` 源文件
 | 响应慢 | 减小 `BSP_RC_LPF_TAU_MS` |
 | 中位漂移 | 增大 `BSP_RC_STICK_DEADZONE` |
 | 离线紫闪 | 查看 M1/M2 离线确认通道和 RS485 链路 |
+| DWT估速差异大 | 对比CH2/CH20、CH4/CH21，检查编码器极性、采样周期和实际减速比 |
+| CH22/CH23恒为0 | 当前误差字段尚未在APP任务中计算赋值 |
 

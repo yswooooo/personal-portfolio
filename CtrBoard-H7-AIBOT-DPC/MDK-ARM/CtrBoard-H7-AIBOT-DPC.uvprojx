@@ -604,9 +604,9 @@
               <FilePath>..\App\Src\app_ld2rs_task.c</FilePath>
             </File>
             <File>
-              <FileName>app_encoder_speed.c</FileName>
+              <FileName>app_encoder_dev.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\App\Src\app_encoder_speed.c</FilePath>
+              <FilePath>..\App\Src\app_encoder_dev.c</FilePath>
             </File>
             <File>
               <FileName>app_chassis_motor_ctrl.c</FileName>

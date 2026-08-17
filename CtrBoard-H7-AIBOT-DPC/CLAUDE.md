@@ -27,7 +27,7 @@
 | 运行模式 | 裸机 HAL，单线程主循环，无 RTOS |
 | 应用模型 | 二轮差速：线速度 v (m/s) + 角速度 omega (rad/s) → 左/右轮 rpm |
 | 底盘参数 | 轮距 657 mm，轮半径 75 mm，齿轮比 20:1 |
-| VOFA+ | JustFloat，20 ms 周期，**实际发送 19 通道** |
+| VOFA+ | JustFloat，20 ms 周期，**实际发送 21 通道** |
 
 ---
 
@@ -44,7 +44,7 @@ App/                应用层，文件统一 app_ 前缀
   app_config.h      业务参数集中配置
   app_chassis_motor_ctrl.c
                     LD2-RS 上电配置、PI 写入、差速解算、RC 业务映射
-  app_encoder_speed.c
+  app_encoder_dev.c
                     相邻有效编码器样本的差分速度估算
   app_ld2rs_task.c  非阻塞电机 FSM、多电机调度、安全停机、编码器样本发布、VOFA 数据填充
   app_led_indicator.c
@@ -169,7 +169,7 @@ IDLE -> READ_REQ -> WAIT_READ -> READ_DONE -> WRITE_REQ -> WAIT_WRITE -> WRITE_D
 
 ## 6. VOFA+ 实际通道
 
-`Core/Src/main.c` 中 `App_Vofa_UpperDisplay()` 当前发送 `float vofa_channels[19]`：
+`Core/Src/main.c` 中 `App_Vofa_UpperDisplay()` 当前发送 `float vofa_channels[21]`：
 
 | CH | 数据 |
 |----|------|
@@ -192,6 +192,8 @@ IDLE -> READ_REQ -> WAIT_READ -> READ_DONE -> WRITE_REQ -> WAIT_WRITE -> WRITE_D
 | 17 | `g_vofa_speed.m2_cycle_ms` |
 | 18 | `g_vofa_speed.m1_encoder_position_counts` |
 | 19 | `g_vofa_speed.m2_encoder_position_counts` |
+| 20 | `g_vofa_speed.m1_encoder_estimated_speed_rpm`，与 CH2 对比 |
+| 21 | `g_vofa_speed.m2_encoder_estimated_speed_rpm`，与 CH4 对比 |
 
 `vofa_motor_info_t` 内部还保留了 `m*_speed_error_rpm`、`m*_read_rtt_ms`、`m*_write_rtt_ms` 等字段，但这些字段当前没有放进 JustFloat 发送数组。
 

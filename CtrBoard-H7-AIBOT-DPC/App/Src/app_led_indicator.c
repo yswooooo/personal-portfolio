@@ -1,6 +1,6 @@
 /**
   ******************************************************************************
-  * @file    led_indicator.c
+  * @file    app_led_indicator.c
   * @brief   系统状态 LED 指示
   *
   * @details 红: 急停生效  黄: 待命  绿: 运行  紫闪: 离线
@@ -22,11 +22,13 @@
 #define APP_LED_FLASH_CYCLE_MS   (APP_LED_FLASH_WINDOW_MS + APP_LED_FLASH_GAP_MS)  /**< 完整周期 */
 #define APP_LED_FLASH_DUTY_DIV   3u      /**< 占空比 1/N: 亮=period/N, 灭=(N-1)*period/N */
 
+/** @copydoc app_led_indicator_init */
 void app_led_indicator_init(void)
 {
     bsp_ws4810_set_rgb(255, 0, 0);  /* 初始红灯 */
 }
 
+/** @copydoc app_led_indicator_update */
 void app_led_indicator_update(void)
 {
     extern volatile uint8_t g_emergency_stop_flag;

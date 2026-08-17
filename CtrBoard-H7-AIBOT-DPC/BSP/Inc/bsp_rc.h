@@ -30,6 +30,12 @@ extern "C" {
 #define BSP_RC_STICK_MAX        800   /**< 摇杆/旋钮最大归一化值 (±800)           */
 #define BSP_RC_SW_POLARITY      (-1)  /**< 拨杆极性: 正=不变, 负=反转             */
 
+/** @brief 摇杆通道极性：统一为上正、左正 */
+#define BSP_RC_CH_RY_POLARITY   (-1)
+#define BSP_RC_CH_RX_POLARITY   (1)
+#define BSP_RC_CH_LX_POLARITY   (1)
+#define BSP_RC_CH_LY_POLARITY   (-1)
+
 /** @brief 遥控摇杆方形死区阈值，单位为归一化后的通道值 */
 #define BSP_RC_STICK_DEADZONE   150.0f
 
@@ -76,10 +82,10 @@ typedef struct {
   * @brief  遥控通道结构体 — 命名访问, 中位=0, 范围约 ±800
   */
 typedef struct {
-    int16_t  ch_ry;     /**< CH1  右摇杆 Y (左右)  右+ 左-                  */
+    int16_t  ch_ry;     /**< CH1  右摇杆 Y (左右)  左+ 右-                  */
     int16_t  ch_rx;     /**< CH2  右摇杆 X (上下)  上+ 下-                  */
     int16_t  ch_lx;     /**< CH3  左摇杆 X (上下)  上+ 下-                  */
-    int16_t  ch_ly;     /**< CH4  左摇杆 Y (左右)  右+ 左-                  */
+    int16_t  ch_ly;     /**< CH4  左摇杆 Y (左右)  左+ 右-                  */
     int16_t          sw_val[4];   /**< CH5~8 拨杆 SWA/B/C/D 模拟值          */
     RC_SwitchState_t sw_st[4];    /**< SWA/B/C/D 拨杆状态 (prev→curr)       */
     int16_t  vra;    /**< CH9  旋钮 VRA  -800 ~ +800               */
@@ -103,10 +109,10 @@ typedef struct {
   *          拨杆、掉线标志、计数器等离散/安全状态仍使用 RC_Channels_t。
   */
 typedef struct {
-    float ch_ry;   /**< CH1 右摇杆 Y 滤波值 */
-    float ch_rx;   /**< CH2 右摇杆 X 滤波值 */
-    float ch_lx;   /**< CH3 左摇杆 X 滤波值 */
-    float ch_ly;   /**< CH4 左摇杆 Y 滤波值 */
+    float ch_ry;   /**< CH1 右摇杆 Y 滤波值，左正右负 */
+    float ch_rx;   /**< CH2 右摇杆 X 滤波值，上正下负 */
+    float ch_lx;   /**< CH3 左摇杆 X 滤波值，上正下负 */
+    float ch_ly;   /**< CH4 左摇杆 Y 滤波值，左正右负 */
 
 } RC_Filter_t;
 

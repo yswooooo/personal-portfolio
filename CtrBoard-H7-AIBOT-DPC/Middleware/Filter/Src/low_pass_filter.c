@@ -9,6 +9,7 @@
 
 /* Exported functions --------------------------------------------------------*/
 
+/** @copydoc low_pass_filter_update_float */
 float low_pass_filter_update_float(float input, float last_output, float alpha)
 {
     return alpha * input + (1.0f - alpha) * last_output;

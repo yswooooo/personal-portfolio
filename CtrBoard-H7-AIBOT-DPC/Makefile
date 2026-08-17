@@ -60,7 +60,7 @@ C_SOURCES := \
   Core/Src/stm32h7xx_hal_msp.c \
   App/Src/app_led_indicator.c \
   App/Src/app_ld2rs_task.c \
-  App/Src/app_encoder_speed.c \
+  App/Src/app_encoder_dev.c \
   App/Src/app_chassis_motor_ctrl.c \
   BSP/Src/bsp_rs485.c \
   BSP/Src/bsp_dwt.c \

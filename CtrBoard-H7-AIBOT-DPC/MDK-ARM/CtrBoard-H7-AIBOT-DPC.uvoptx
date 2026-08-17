@@ -183,7 +183,7 @@
         <Ww>
           <count>5</count>
           <WinNumber>1</WinNumber>
-          <ItemText>s_motor_fsm_m1.speed_estimator.motor_speed_rpm</ItemText>
+          <ItemText>g_motor_fsm_m1.encoder_estimator.motor_speed_rpm</ItemText>
         </Ww>
         <Ww>
           <count>6</count>
@@ -193,17 +193,17 @@
         <Ww>
           <count>7</count>
           <WinNumber>1</WinNumber>
-          <ItemText>s_motor_fsm_m2.speed_estimator.motor_speed_rpm</ItemText>
+          <ItemText>g_motor_fsm_m2.encoder_estimator.motor_speed_rpm</ItemText>
         </Ww>
         <Ww>
           <count>8</count>
           <WinNumber>1</WinNumber>
-          <ItemText>s_motor_fsm_m1.speed_estimator.wheel_speed_mps</ItemText>
+          <ItemText>g_motor_fsm_m1.encoder_estimator.wheel_speed_mps</ItemText>
         </Ww>
         <Ww>
           <count>9</count>
           <WinNumber>1</WinNumber>
-          <ItemText>s_motor_fsm_m2.speed_estimator.wheel_speed_mps</ItemText>
+          <ItemText>g_motor_fsm_m2.encoder_estimator.wheel_speed_mps</ItemText>
         </Ww>
         <Ww>
           <count>10</count>
@@ -214,6 +214,11 @@
           <count>11</count>
           <WinNumber>1</WinNumber>
           <ItemText>g_vofa_speed.m2_encoder_position_counts</ItemText>
+        </Ww>
+        <Ww>
+          <count>12</count>
+          <WinNumber>1</WinNumber>
+          <ItemText>g_numeric_max_increment_test,0x0A</ItemText>
         </Ww>
       </WatchWindow1>
       <Tracepoint>
@@ -429,8 +434,8 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\App\Src\app_encoder_speed.c</PathWithFileName>
-      <FilenameWithoutPath>app_encoder_speed.c</FilenameWithoutPath>
+      <PathWithFileName>..\App\Src\app_encoder_dev.c</PathWithFileName>
+      <FilenameWithoutPath>app_encoder_dev.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>

@@ -101,11 +101,19 @@ void bsp_rc_on_frame_received(uint16_t frame_len)
                 }
 
                 {
-                    /* 逐字段赋值 + 中位归零 + 拨杆极性反转 */
-                    g_rc.ch_ry =  (int16_t)(raw_channels[0] - BSP_SBUS_MID_VALUE);
-                    g_rc.ch_rx =  (int16_t)(raw_channels[1] - BSP_SBUS_MID_VALUE);
-                    g_rc.ch_lx =  (int16_t)(raw_channels[2] - BSP_SBUS_MID_VALUE);
-                    g_rc.ch_ly =  (int16_t)(raw_channels[3] - BSP_SBUS_MID_VALUE);
+                    /* 逐字段赋值 + 中位归零 + 摇杆通道极性统一 */
+                    g_rc.ch_ry =
+                        (int16_t)(((int16_t)raw_channels[0] - (int16_t)BSP_SBUS_MID_VALUE)
+                                  * BSP_RC_CH_RY_POLARITY);
+                    g_rc.ch_rx =
+                        (int16_t)(((int16_t)raw_channels[1] - (int16_t)BSP_SBUS_MID_VALUE)
+                                  * BSP_RC_CH_RX_POLARITY);
+                    g_rc.ch_lx =
+                        (int16_t)(((int16_t)raw_channels[2] - (int16_t)BSP_SBUS_MID_VALUE)
+                                  * BSP_RC_CH_LX_POLARITY);
+                    g_rc.ch_ly =
+                        (int16_t)(((int16_t)raw_channels[3] - (int16_t)BSP_SBUS_MID_VALUE)
+                                  * BSP_RC_CH_LY_POLARITY);
 
                     g_rc.vra   =  (int16_t)(raw_channels[8] - BSP_SBUS_VAR_VALUE);
                     g_rc.vrb   =  (int16_t)(raw_channels[9] - BSP_SBUS_VAR_VALUE);

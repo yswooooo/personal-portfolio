@@ -25,7 +25,7 @@
   */
 
 #include "app_ld2rs_task.h"
-#include "app_encoder_speed.h"
+#include "app_encoder_dev.h"
 #include "bsp_rs485.h"
 #include "bsp_dwt.h"
 #include "app_chassis_motor_ctrl.h"
@@ -41,84 +41,19 @@
 #define APP_LD2RS_TASK_MODBUS_READ_QTY_TWO    0x0002u  /**< 一次读 2 个寄存器 (连续)    */
 #define APP_LD2RS_TASK_MAX_RETRY           3u       /**< MotorRuntime 层最大逻辑重试  */
 
-/* ------------------------------------------------------------------ */
-/* 电机控制阶段                                                        */
-/* ------------------------------------------------------------------ */
+/**
+  * @brief 单次状态机推进后对共享 RS485 总线的处理结果。
+  */
 typedef enum {
-    APP_LD2RS_TASK_PHASE_IDLE = 0,   /**< 空闲, 等周期计时器          */
-    APP_LD2RS_TASK_PHASE_READ_REQ,   /**< 发送当前读子事务请求        */
-    APP_LD2RS_TASK_PHASE_WAIT_READ,  /**< 等待当前读子事务应答        */
-    APP_LD2RS_TASK_PHASE_READ_DONE,  /**< 本轮反馈读取完成            */
-    APP_LD2RS_TASK_PHASE_WRITE_REQ,  /**< 发送目标转速写入请求        */
-    APP_LD2RS_TASK_PHASE_WAIT_WRITE, /**< 等待目标转速写入应答        */
-    APP_LD2RS_TASK_PHASE_WRITE_DONE, /**< 本轮读写完成                */
-} motor_ctrl_phase_t;
-
-typedef enum {
-    APP_LD2RS_READ_TRANSACTION_STATUS_SPEED = 0,
-    APP_LD2RS_READ_TRANSACTION_ENCODER_POSITION,
-} motor_read_transaction_t;
-
-typedef enum {
-    APP_MOTOR_FSM_STEP_NONE = 0,
-    APP_MOTOR_FSM_STEP_STARTED,
-    APP_MOTOR_FSM_STEP_WAITING,
-    APP_MOTOR_FSM_STEP_DONE_RELEASED,
-    APP_MOTOR_FSM_STEP_ERROR_RELEASED
+    APP_MOTOR_FSM_STEP_NONE = 0,       /**< 本次未启动事务，也未释放总线。 */
+    APP_MOTOR_FSM_STEP_STARTED,        /**< 已启动新的 RS485 事务。 */
+    APP_MOTOR_FSM_STEP_WAITING,        /**< 当前电机仍在等待事务结果。 */
+    APP_MOTOR_FSM_STEP_DONE_RELEASED,  /**< 事务成功结束并已释放总线。 */
+    APP_MOTOR_FSM_STEP_ERROR_RELEASED  /**< 事务异常结束并已释放总线。 */
 } app_motor_fsm_step_result_t;
 
-/* ------------------------------------------------------------------ */
-/* 电机运行时状态 (在 motor_ctrl_t 基础上追加)                           */
-/* ------------------------------------------------------------------ */
-typedef struct {
-    /* Modbus 帧缓冲区 */
-    uint8_t             tx_frame[8];
-    uint8_t             rx_frame[32];
-
-    /* 读回的 2 个寄存器值 */
-    uint16_t            status_word;          /**< PrB.05 运行状态       */
-    uint16_t            actual_speed_rpm;           /**< PrB.06 未滤波转速     */
-    int32_t             encoder_position_counts;   /**< PrB.24 编码器反馈位置 */
-
-    /* 编码器差分估计 */
-    app_encoder_sample_t encoder_sample;             /**< 最近一次有效编码器样本 */
-    app_encoder_speed_estimator_t speed_estimator;   /**< 编码器速度估算状态     */
-
-    /* 状态机 */
-    motor_ctrl_phase_t       phase;             /**< 当前阶段              */
-    motor_read_transaction_t read_transaction;  /**< 当前读子事务          */
-    uint8_t                  read_retry_count;  /**< 当前读子事务重试计数  */
-    uint8_t                  write_retry_count; /**< 写阶段逻辑重试计数    */
-
-    /* 指向电机控制上下文的句柄 */
-    ld2rs_motor_ctrl_t        *motor_ctrl;
-    ld2_motor_handle_t *motor_dev;
-
-    /* 目标转速 (由差速解算结果赋值) */
-    int16_t             target_speed_rpm;
-
-    /* 诊断: 事务耗时打桩 */
-    uint32_t            tx_start_tick_ms;     /**< 本次 TX 发起时刻 (打桩) */
-    uint32_t            read_rtt_ms;       /**< 读事务往返耗时 (ms)     */
-    uint32_t            write_rtt_ms;      /**< 写事务往返耗时 (ms)     */
-    uint32_t            cycle_start_tick_ms;  /**< 本闭环起始时刻          */
-    uint32_t            cycle_elapsed_ms;  /**< 完整闭环耗时 (ms)       */
-
-    uint8_t             offline_miss_count;    /**< 连续事务无应答次数      */
-    uint8_t             is_offline_confirmed;  /**< 连续无应答确认离线      */
-    uint32_t            offline_total_count;   /**< 历史事务无应答总次数    */
-
-    uint8_t             force_zero_speed;      /**< READ重试耗尽→强制零速, 跨advance存活 */
-} motor_fsm_t;
-
-typedef struct {
-    motor_fsm_t *motor_fsm_table[APP_LD2_MOTOR_MAX_COUNT];
-    uint8_t      motor_count;
-    uint8_t      current_index;
-} motor_fsm_scheduler_t;
-
-static motor_fsm_t s_motor_fsm_m1;
-static motor_fsm_t s_motor_fsm_m2;
+motor_fsm_t g_motor_fsm_m1;
+motor_fsm_t g_motor_fsm_m2;
 static motor_fsm_scheduler_t s_motor_fsm_scheduler;
 
 /* ------------------------------------------------------------------ */
@@ -126,12 +61,17 @@ static motor_fsm_scheduler_t s_motor_fsm_scheduler;
 /* ------------------------------------------------------------------ */
 static void app_motor_fsm_init(motor_fsm_t *fsm,
                                ld2rs_motor_ctrl_t *motor_ctrl, ld2_motor_handle_t *motor_dev);
-static void app_motor_fsm_sync_vofa_offline(const motor_fsm_t *fsm);
 static void app_motor_fsm_mark_response_ok(motor_fsm_t *fsm);
 static void app_motor_fsm_mark_no_response(motor_fsm_t *fsm);
 static app_motor_fsm_step_result_t app_motor_fsm_step(motor_fsm_t *fsm,
                                                       bsp_rs485_state_t bus_state);
 
+/**
+  * @brief 将完整的新编码器样本发布到电机运行时。
+  * @param[out] target 目标样本对象。
+  * @param[in]  source 已完成解析并带时间戳的新样本。
+  * @note  字段按 counts、timestamp_us、sequence 的顺序复制，sequence 最后更新。
+  */
 static void app_encoder_sample_publish(app_encoder_sample_t *target,
                                        const app_encoder_sample_t *source)
 {
@@ -144,21 +84,92 @@ static void app_encoder_sample_publish(app_encoder_sample_t *target,
     target->sequence = source->sequence;
 }
 
+/**
+  * @brief 从编码器估算器复制对外所需的三类速度反馈。
+  * @param[out] feedback  对外反馈结构。
+  * @param[in]  estimator 已得到有效结果的编码器速度估算器。
+  */
 static void app_ld2rs_speed_feedback_copy(
     app_ld2rs_speed_feedback_t *feedback,
-    const app_encoder_speed_estimator_t *estimator)
+    const app_encoder_estimator_t *estimator)
 {
     feedback->motor_speed_rpm = estimator->motor_speed_rpm;
     feedback->wheel_speed_rpm = estimator->wheel_speed_rpm;
     feedback->wheel_speed_mps = estimator->wheel_speed_mps;
 }
 
+/**
+  * @brief 将两台电机 FSM 的完整观测数据集中传递到 VOFA 结构。
+  * @param[out] vofa_data VOFA+ JustFloat 电机观测数据。
+  * @param[in]  motor_m1  M1 电机 FSM 运行时。
+  * @param[in]  motor_m2  M2 电机 FSM 运行时。
+  * @note  任一参数为 NULL 时不更新 vofa_data。
+  */
+static void app_ld2rs_vofa_data_transfer(
+    vofa_motor_info_t *vofa_data,
+    const motor_fsm_t *motor_m1,
+    const motor_fsm_t *motor_m2)
+{
+    float feedback_m1;
+    float feedback_m2;
+
+    if ((vofa_data == NULL) || (motor_m1 == NULL) || (motor_m2 == NULL)) {
+        return;
+    }
+
+    feedback_m1 = (float)((int16_t)motor_m1->actual_speed_rpm);
+    feedback_m2 = (float)((int16_t)motor_m2->actual_speed_rpm);
+
+    vofa_data->m1_ref_speed_rpm = (float)motor_m1->target_speed_rpm;
+    vofa_data->m1_feedback_speed_rpm = feedback_m1;
+    vofa_data->m1_speed_error_rpm =
+        vofa_data->m1_ref_speed_rpm - feedback_m1;
+    vofa_data->m1_read_rtt_ms = (float)motor_m1->read_rtt_ms;
+    vofa_data->m1_write_rtt_ms = (float)motor_m1->write_rtt_ms;
+    vofa_data->m1_cycle_ms = (float)motor_m1->cycle_elapsed_ms;
+
+    vofa_data->m2_ref_speed_rpm = (float)motor_m2->target_speed_rpm;
+    vofa_data->m2_feedback_speed_rpm = feedback_m2;
+    vofa_data->m2_speed_error_rpm =
+        vofa_data->m2_ref_speed_rpm - feedback_m2;
+    vofa_data->m2_read_rtt_ms = (float)motor_m2->read_rtt_ms;
+    vofa_data->m2_write_rtt_ms = (float)motor_m2->write_rtt_ms;
+    vofa_data->m2_cycle_ms = (float)motor_m2->cycle_elapsed_ms;
+
+    vofa_data->m1_offline_total_count =
+        (float)motor_m1->offline_total_count;
+    vofa_data->m1_offline_confirmed =
+        (float)motor_m1->is_offline_confirmed;
+    vofa_data->m2_offline_total_count =
+        (float)motor_m2->offline_total_count;
+    vofa_data->m2_offline_confirmed =
+        (float)motor_m2->is_offline_confirmed;
+
+    vofa_data->m1_encoder_position_counts =
+        (float)motor_m1->encoder_position_counts;
+    vofa_data->m2_encoder_position_counts =
+        (float)motor_m2->encoder_position_counts;
+    vofa_data->m1_encoder_estimated_speed_rpm =
+        motor_m1->encoder_estimator.motor_speed_rpm;
+    vofa_data->m2_encoder_estimated_speed_rpm =
+        motor_m2->encoder_estimator.motor_speed_rpm;
+    vofa_data->est_error_m1_rpm =
+        vofa_data->m1_encoder_estimated_speed_rpm - feedback_m1;
+    vofa_data->est_error_m2_rpm =
+        vofa_data->m2_encoder_estimated_speed_rpm - feedback_m2;
+}
+
+/**
+  * @brief 清零编码器样本和速度估算器运行时。
+  * @param[out] sample    待复位的编码器样本。
+  * @param[out] estimator 待复位的速度估算器。
+  */
 static void app_encoder_runtime_reset(
     app_encoder_sample_t *sample,
-    app_encoder_speed_estimator_t *estimator)
+    app_encoder_estimator_t *estimator)
 {
     *sample = (app_encoder_sample_t){0};
-    *estimator = (app_encoder_speed_estimator_t){0};
+    *estimator = (app_encoder_estimator_t){0};
 }
 
 static void app_motor_fsm_scheduler_init(motor_fsm_scheduler_t *scheduler,
@@ -171,14 +182,22 @@ static void app_motor_fsm_scheduler_advance(motor_fsm_scheduler_t *scheduler);
 /* Modbus 帧组装助手 (原地, 不依赖 modbus_rtu.c 静态函数)                */
 /* ------------------------------------------------------------------ */
 
-/** @brief 将 uint16_t 以大端写入 buf[idx..idx+1] */
+/**
+  * @brief 将 uint16_t 以大端顺序写入两个连续字节。
+  * @param[out] buffer    至少包含 2 byte 的输出缓冲区。
+  * @param[in]  value_u16 待编码的 16 bit 无符号值。
+  */
 static void app_ld2rs_task_put_u16(uint8_t *buffer, uint16_t value_u16)
 {
     buffer[0] = (uint8_t)(value_u16 >> 8);
     buffer[1] = (uint8_t)(value_u16 & 0xFFu);
 }
 
-/** @brief 从 buf[idx..idx+1] 以大端读取 uint16_t */
+/**
+  * @brief 从两个连续的大端字节读取 uint16_t。
+  * @param[in] buffer 至少包含 2 byte 的输入缓冲区。
+  * @return 解码后的 16 bit 无符号值。
+  */
 static uint16_t app_ld2rs_task_get_u16(const uint8_t *buffer)
 {
     return (uint16_t)(((uint16_t)buffer[0] << 8) | (uint16_t)buffer[1]);
@@ -186,10 +205,10 @@ static uint16_t app_ld2rs_task_get_u16(const uint8_t *buffer)
 
 /**
   * @brief  组装 0x03 读寄存器请求帧 (8 字节)
-  * @param  frame_buffer     输出帧缓冲区 (8 字节)
-  * @param  slave_id  从机站号
-  * @param  reg_addr 起始寄存器地址
-  * @param  quantity     读取数量 (1~125)
+  * @param[out] frame_buffer 输出帧缓冲区，长度至少为 8 byte。
+  * @param[in]  slave_id    Modbus 从机站号。
+  * @param[in]  reg_addr    起始寄存器地址。
+  * @param[in]  quantity    连续读取寄存器数量，范围 1~125。
   */
 static void app_ld2rs_task_build_read_req(uint8_t *frame_buffer, uint8_t slave_id,
                               uint16_t reg_addr, uint16_t quantity)
@@ -207,6 +226,10 @@ static void app_ld2rs_task_build_read_req(uint8_t *frame_buffer, uint8_t slave_i
 
 /**
   * @brief  组装 0x06 写单个寄存器请求帧 (8 字节)
+  * @param[out] frame_buffer 输出帧缓冲区，长度至少为 8 byte。
+  * @param[in]  slave_id    Modbus 从机站号。
+  * @param[in]  reg_addr    待写寄存器地址。
+  * @param[in]  value_u16   待写入的 16 bit 寄存器值。
   */
 static void app_ld2rs_task_build_write_req(uint8_t *frame_buffer, uint8_t slave_id,
                                uint16_t reg_addr, uint16_t value_u16)
@@ -226,13 +249,13 @@ static void app_ld2rs_task_build_write_req(uint8_t *frame_buffer, uint8_t slave_
   * @brief  校验 Modbus 应答帧 (函数码感知长度检查)
   *
   * @details 0x03 响应 (读): ID(1)+FC(1)+字节数(1)+数据(≥2)+CRC(2) ≥ 7
-  *          0x06 响应 (写): ID(1)+FC(1)+地址(2)+值(2)+CRC(2) = 6
+  *          0x06 响应 (写): ID(1)+FC(1)+地址(2)+值(2)+CRC(2) = 8
   *
-  * @param  rx_buffer               接收帧缓冲区
-  * @param  rx_len          实际接收长度
-  * @param  expected_slave_id 期望站号
-  * @param  expected_func    期望功能码 (0x03 或 0x06)
-  * @retval 1 有效, 0 无效
+  * @param[in] rx_buffer        接收帧缓冲区。
+  * @param[in] rx_len           实际接收长度，byte。
+  * @param[in] expected_slave_id 期望的 Modbus 从机站号。
+  * @param[in] expected_func    期望功能码，0x03 或 0x06。
+  * @return 1 表示长度、CRC、站号和功能码均有效；0 表示应答无效。
   */
 static uint8_t app_ld2rs_task_validate_resp(const uint8_t *rx_buffer, uint16_t rx_len,
                                 uint8_t expected_slave_id,
@@ -281,7 +304,10 @@ static uint8_t app_ld2rs_task_validate_resp(const uint8_t *rx_buffer, uint16_t r
 /* ------------------------------------------------------------------ */
 
 /**
-  * @brief  初始化电机运行时
+  * @brief 初始化单台电机的通信状态机和运动反馈运行时。
+  * @param[out] fsm        待初始化的电机 FSM。
+  * @param[in]  motor_ctrl 对应的应用层电机控制上下文。
+  * @param[in]  motor_dev  对应的 LD2-RS 协议设备句柄。
   */
 static void app_motor_fsm_init(motor_fsm_t *fsm,
                               ld2rs_motor_ctrl_t *motor_ctrl, ld2_motor_handle_t *motor_dev)
@@ -297,7 +323,7 @@ static void app_motor_fsm_init(motor_fsm_t *fsm,
     fsm->actual_speed_rpm         = 0u;
     fsm->encoder_position_counts = 0;
     app_encoder_runtime_reset(&fsm->encoder_sample,
-                              &fsm->speed_estimator);
+                              &fsm->encoder_estimator);
     fsm->tx_start_tick_ms   = 0u;
     fsm->read_rtt_ms     = 0u;
     fsm->write_rtt_ms    = 0u;
@@ -307,24 +333,12 @@ static void app_motor_fsm_init(motor_fsm_t *fsm,
     fsm->is_offline_confirmed = 0u;
     fsm->offline_total_count  = 0u;
     fsm->force_zero_speed     = 0u;
-    app_motor_fsm_sync_vofa_offline(fsm);
 }
 
-static void app_motor_fsm_sync_vofa_offline(const motor_fsm_t *fsm)
-{
-    if ((fsm == NULL) || (fsm->motor_ctrl == NULL)) {
-        return;
-    }
-
-    if (fsm->motor_ctrl->motor_id == 1u) {
-        g_vofa_speed.m1_offline_total_count = (float)fsm->offline_total_count;
-        g_vofa_speed.m1_offline_confirmed = (float)fsm->is_offline_confirmed;
-    } else if (fsm->motor_ctrl->motor_id == 2u) {
-        g_vofa_speed.m2_offline_total_count = (float)fsm->offline_total_count;
-        g_vofa_speed.m2_offline_confirmed = (float)fsm->is_offline_confirmed;
-    }
-}
-
+/**
+  * @brief 记录一次有效应答并清除连续离线计数和离线确认标志。
+  * @param[in,out] fsm 电机 FSM 运行时。
+  */
 static void app_motor_fsm_mark_response_ok(motor_fsm_t *fsm)
 {
     if ((fsm == NULL) || (fsm->motor_ctrl == NULL)) {
@@ -333,9 +347,13 @@ static void app_motor_fsm_mark_response_ok(motor_fsm_t *fsm)
 
     fsm->offline_miss_count = 0u;
     fsm->is_offline_confirmed = 0u;
-    app_motor_fsm_sync_vofa_offline(fsm);
 }
 
+/**
+  * @brief 记录一次无有效应答并按阈值更新离线确认状态。
+  * @param[in,out] fsm 电机 FSM 运行时。
+  * @note  offline_total_count 持续累计；offline_miss_count 达到配置阈值后饱和。
+  */
 static void app_motor_fsm_mark_no_response(motor_fsm_t *fsm)
 {
     if ((fsm == NULL) || (fsm->motor_ctrl == NULL)) {
@@ -349,9 +367,12 @@ static void app_motor_fsm_mark_no_response(motor_fsm_t *fsm)
     if (fsm->offline_miss_count >= APP_LD2_MOTOR_OFFLINE_CONFIRM_COUNT) {
         fsm->is_offline_confirmed = 1u;
     }
-    app_motor_fsm_sync_vofa_offline(fsm);
 }
 
+/**
+  * @brief 判断当前是否需要立即执行安全零速停机。
+  * @return 1 表示急停、遥控掉线或 SWA 向下任一条件成立；0 表示允许正常控制。
+  */
 static uint8_t app_motor_fsm_safety_stop_active(void)
 {
     extern volatile uint8_t g_emergency_stop_flag;
@@ -361,6 +382,13 @@ static uint8_t app_motor_fsm_safety_stop_active(void)
         || (g_rc.sw_st[eRC_SW_A].curr == eRC_POS_DOWN));
 }
 
+/**
+  * @brief 处理状态/速度或编码器读事务失败后的应用层重试策略。
+  * @param[in,out] fsm             电机 FSM 运行时。
+  * @param[in]     released_result 当前事务释放总线后的步骤结果。
+  * @return 状态机推进结果；重试或状态/速度读耗尽时返回 released_result，
+  *         编码器读耗尽并转入 READ_DONE 时返回 APP_MOTOR_FSM_STEP_NONE。
+  */
 static app_motor_fsm_step_result_t app_motor_fsm_handle_read_failure(
     motor_fsm_t *fsm,
     app_motor_fsm_step_result_t released_result)
@@ -389,8 +417,9 @@ static app_motor_fsm_step_result_t app_motor_fsm_handle_read_failure(
   *         状态速度与编码器读子事务分别最多执行 3 次 APP 逻辑尝试。
   *         编码器重试耗尽仅放弃本轮观测, 保留旧值并继续速度写入。
   *
-  * @param  fsm       电机运行时句柄
-  * @param  bus_state 总线当前状态 (由上层 app_ld2rs_task_run 统一 Poll 一次获得)
+  * @param[in,out] fsm       电机 FSM 运行时。
+  * @param[in]     bus_state 由 app_ld2rs_task_run() 统一 Poll 得到的总线状态。
+  * @return 本次推进是否启动事务、等待事务或已释放总线。
   */
 static app_motor_fsm_step_result_t app_motor_fsm_step(motor_fsm_t *fsm,
                                                       bsp_rs485_state_t bus_state)
@@ -502,18 +531,6 @@ static app_motor_fsm_step_result_t app_motor_fsm_step(motor_fsm_t *fsm,
                     fsm->read_rtt_ms =
                         HAL_GetTick() - fsm->tx_start_tick_ms;
 
-                    if (fsm->motor_ctrl->motor_id == 1u) {
-                        g_vofa_speed.m1_feedback_speed_rpm =
-                            (float)((int16_t)fsm->actual_speed_rpm);
-                        g_vofa_speed.m1_read_rtt_ms =
-                            (float)fsm->read_rtt_ms;
-                    } else {
-                        g_vofa_speed.m2_feedback_speed_rpm =
-                            (float)((int16_t)fsm->actual_speed_rpm);
-                        g_vofa_speed.m2_read_rtt_ms =
-                            (float)fsm->read_rtt_ms;
-                    }
-
                     app_motor_fsm_mark_response_ok(fsm);
                     fsm->read_retry_count = 0u;
                     fsm->read_transaction =
@@ -541,14 +558,6 @@ static app_motor_fsm_step_result_t app_motor_fsm_step(motor_fsm_t *fsm,
                     new_sample.sequence = fsm->encoder_sample.sequence + 1u;
                     app_encoder_sample_publish(&fsm->encoder_sample,
                                                &new_sample);
-
-                    if (fsm->motor_ctrl->motor_id == 1u) {
-                        g_vofa_speed.m1_encoder_position_counts =
-                            (float)fsm->encoder_position_counts;
-                    } else {
-                        g_vofa_speed.m2_encoder_position_counts =
-                            (float)fsm->encoder_position_counts;
-                    }
 
                     fsm->read_retry_count = 0u;
                     fsm->phase = APP_LD2RS_TASK_PHASE_READ_DONE;
@@ -611,15 +620,6 @@ static app_motor_fsm_step_result_t app_motor_fsm_step(motor_fsm_t *fsm,
                 ref_speed_rpm = (int16_t)(-APP_CHASSIS_SPEED_LIMIT_RPM);
             }
 
-            /* 填充 VOFA 给定转速 */
-            if (fsm->motor_ctrl->motor_id == 1u) {
-                g_vofa_speed.m1_ref_speed_rpm  = (float)ref_speed_rpm;
-                g_vofa_speed.m1_speed_error_rpm = g_vofa_speed.m1_ref_speed_rpm - g_vofa_speed.m1_feedback_speed_rpm;
-            } else {
-                g_vofa_speed.m2_ref_speed_rpm  = (float)ref_speed_rpm;
-                g_vofa_speed.m2_speed_error_rpm = g_vofa_speed.m2_ref_speed_rpm - g_vofa_speed.m2_feedback_speed_rpm;
-            }
-
             app_ld2rs_task_build_write_req(fsm->tx_frame, fsm->motor_dev->slave_id,
                                LD2_MOTOR_REG_SPEED_TARGET, (uint16_t)ref_speed_rpm);
         }
@@ -639,13 +639,8 @@ static app_motor_fsm_step_result_t app_motor_fsm_step(motor_fsm_t *fsm,
             if (app_ld2rs_task_validate_resp(fsm->rx_frame, g_rs485_bus.rx_len,
                                  fsm->motor_dev->slave_id,
                                  MODBUS_RTU_FC_WRITE_SINGLE)) {
-                /* 打桩: 写 RTT + VOFA */
+                /* 打桩: 写事务往返时间 */
                 fsm->write_rtt_ms = HAL_GetTick() - fsm->tx_start_tick_ms;
-                if (fsm->motor_ctrl->motor_id == 1u) {
-                    g_vofa_speed.m1_write_rtt_ms = (float)fsm->write_rtt_ms;
-                } else {
-                    g_vofa_speed.m2_write_rtt_ms = (float)fsm->write_rtt_ms;
-                }
                 app_motor_fsm_mark_response_ok(fsm);
                 fsm->write_retry_count = 0u;
             } else {
@@ -691,13 +686,8 @@ static app_motor_fsm_step_result_t app_motor_fsm_step(motor_fsm_t *fsm,
 
     /* ------------------------------------------------------------ */
     case APP_LD2RS_TASK_PHASE_WRITE_DONE:
-        /* 打桩: 完整闭环耗时 → VOFA */
+        /* 打桩: 完整闭环耗时 */
         fsm->cycle_elapsed_ms = now_tick - fsm->cycle_start_tick_ms;
-        if (fsm->motor_ctrl->motor_id == 1u) {
-            g_vofa_speed.m1_cycle_ms     = (float)fsm->cycle_elapsed_ms;
-        } else {
-            g_vofa_speed.m2_cycle_ms     = (float)fsm->cycle_elapsed_ms;
-        }
         /* 更新计时器, 本轮完成 */
         fsm->motor_ctrl->last_speed_update_tick_ms = now_tick;
         fsm->phase = APP_LD2RS_TASK_PHASE_IDLE;
@@ -711,6 +701,11 @@ static app_motor_fsm_step_result_t app_motor_fsm_step(motor_fsm_t *fsm,
     return APP_MOTOR_FSM_STEP_NONE;
 }
 
+/**
+  * @brief 初始化共享 RS485 总线的多电机轮询调度器。
+  * @param[out] scheduler   待初始化的调度器。
+  * @param[in]  motor_count 参与轮询的电机数量，超过上限时自动截断。
+  */
 static void app_motor_fsm_scheduler_init(motor_fsm_scheduler_t *scheduler,
                                          uint8_t motor_count)
 {
@@ -733,17 +728,22 @@ static void app_motor_fsm_scheduler_init(motor_fsm_scheduler_t *scheduler,
 
 #if (APP_LD2_MOTOR_MAX_COUNT >= 1u)
     if ((APP_LD2_MOTOR_COUNT >= 1u) && (scheduler->motor_count >= 1u)) {
-        scheduler->motor_fsm_table[0] = &s_motor_fsm_m1;
+        scheduler->motor_fsm_table[0] = &g_motor_fsm_m1;
     }
 #endif
 
 #if (APP_LD2_MOTOR_MAX_COUNT >= 2u)
     if ((APP_LD2_MOTOR_COUNT >= 2u) && (scheduler->motor_count >= 2u)) {
-        scheduler->motor_fsm_table[1] = &s_motor_fsm_m2;
+        scheduler->motor_fsm_table[1] = &g_motor_fsm_m2;
     }
 #endif
 }
 
+/**
+  * @brief 将轮询权切换到下一台电机。
+  * @param[in,out] scheduler 电机轮询调度器。
+  * @note  scheduler 为 NULL 或 motor_count 为 0 时不执行切换。
+  */
 static void app_motor_fsm_scheduler_advance(motor_fsm_scheduler_t *scheduler)
 {
     if ((scheduler == NULL) || (scheduler->motor_count == 0u)) {
@@ -754,6 +754,12 @@ static void app_motor_fsm_scheduler_advance(motor_fsm_scheduler_t *scheduler)
                                % scheduler->motor_count);
 }
 
+/**
+  * @brief 推进当前电机 FSM，并在事务释放总线后切换轮询对象。
+  * @param[in,out] scheduler 电机轮询调度器。
+  * @param[in]     bus_state 本轮统一 Poll 得到的 RS485 总线状态。
+  * @note  任意时刻只推进 current_index 指向的一台电机，避免共享总线竞争。
+  */
 static void app_motor_fsm_scheduler_step(motor_fsm_scheduler_t *scheduler,
                                          bsp_rs485_state_t bus_state)
 {
@@ -847,15 +853,15 @@ void app_ld2rs_task_run(void)
                       &g_rc_chassis.i16LeftRpm,  &g_rc_chassis.i16RightRpm);
 
     /* 目标转速赋给各电机运行时 */
-    s_motor_fsm_m1.target_speed_rpm = g_rc_chassis.i16LeftRpm;
-    s_motor_fsm_m2.target_speed_rpm = g_rc_chassis.i16RightRpm;
+    g_motor_fsm_m1.target_speed_rpm = g_rc_chassis.i16LeftRpm;
+    g_motor_fsm_m2.target_speed_rpm = g_rc_chassis.i16RightRpm;
 
     /* FSM 层强制零速: READ 重试耗尽标志, 优先级高于 RC 但低于安全停机 */
-    if (s_motor_fsm_m1.force_zero_speed) {
-        s_motor_fsm_m1.target_speed_rpm = 0;
+    if (g_motor_fsm_m1.force_zero_speed) {
+        g_motor_fsm_m1.target_speed_rpm = 0;
     }
-    if (s_motor_fsm_m2.force_zero_speed) {
-        s_motor_fsm_m2.target_speed_rpm = 0;
+    if (g_motor_fsm_m2.force_zero_speed) {
+        g_motor_fsm_m2.target_speed_rpm = 0;
     }
 
     /* 安全停机: 优先级最高, 最终覆盖所有 */
@@ -865,35 +871,40 @@ void app_ld2rs_task_run(void)
 
         if (g_emergency_stop_flag || g_rc.lost_flag
             || (g_rc.sw_st[eRC_SW_A].curr == eRC_POS_DOWN)) {
-            s_motor_fsm_m1.target_speed_rpm = 0;
-            s_motor_fsm_m2.target_speed_rpm = 0;
+            g_motor_fsm_m1.target_speed_rpm = 0;
+            g_motor_fsm_m2.target_speed_rpm = 0;
         }
     }
 
     app_motor_fsm_scheduler_step(&s_motor_fsm_scheduler, bus_state);
 
-    app_encoder_speed_update(&s_motor_fsm_m1.encoder_sample,
-                             &s_motor_fsm_m1.speed_estimator,
-                             APP_LD2_ENCODER_POLARITY_M1);
-    app_encoder_speed_update(&s_motor_fsm_m2.encoder_sample,
-                             &s_motor_fsm_m2.speed_estimator,
-                             APP_LD2_ENCODER_POLARITY_M2);
+    app_encoder_update(&g_motor_fsm_m1.encoder_sample,
+                       &g_motor_fsm_m1.encoder_estimator,
+                       APP_LD2_ENCODER_POLARITY_M1);
+    app_encoder_update(&g_motor_fsm_m2.encoder_sample,
+                       &g_motor_fsm_m2.encoder_estimator,
+                       APP_LD2_ENCODER_POLARITY_M2);
+    app_ld2rs_vofa_data_transfer(
+        &g_vofa_speed,
+        &g_motor_fsm_m1,
+        &g_motor_fsm_m2);
 }
 
+/** @copydoc app_ld2rs_task_get_speed_feedback */
 bool app_ld2rs_task_get_speed_feedback(
     uint8_t motor_number,
     app_ld2rs_speed_feedback_t *feedback)
 {
-    const app_encoder_speed_estimator_t *estimator;
+    const app_encoder_estimator_t *estimator;
 
     if (feedback == NULL) {
         return false;
     }
 
     if (motor_number == 1u) {
-        estimator = &s_motor_fsm_m1.speed_estimator;
+        estimator = &g_motor_fsm_m1.encoder_estimator;
     } else if (motor_number == 2u) {
-        estimator = &s_motor_fsm_m2.speed_estimator;
+        estimator = &g_motor_fsm_m2.encoder_estimator;
     } else {
         return false;
     }
@@ -906,21 +917,29 @@ bool app_ld2rs_task_get_speed_feedback(
     return true;
 }
 
-/**
-  * @brief  初始化电机运行时 (main.c 启动阶段调用一次)
-  */
+/** @copydoc app_ld2rs_status_getter */
+int16_t app_ld2rs_status_getter(const motor_fsm_t *motor)
+{
+    if (motor == NULL) {
+        return 0;
+    }
+
+    return (int16_t)motor->actual_speed_rpm;
+}
+
+/** @copydoc app_ld2rs_task_init */
 void app_ld2rs_task_init(void)
 {
-    app_motor_fsm_init(&s_motor_fsm_m1, &g_ld2rs_motor_ctrl_m1, &g_ld2rs_dev_m1);
-    app_motor_fsm_init(&s_motor_fsm_m2, &g_ld2rs_motor_ctrl_m2, &g_ld2rs_dev_m2);
+    app_motor_fsm_init(&g_motor_fsm_m1, &g_ld2rs_motor_ctrl_m1, &g_ld2rs_dev_m1);
+    app_motor_fsm_init(&g_motor_fsm_m2, &g_ld2rs_motor_ctrl_m2, &g_ld2rs_dev_m2);
 
     app_motor_fsm_scheduler_init(&s_motor_fsm_scheduler, APP_LD2_MOTOR_COUNT);
 
     /* 轮询调度从 index 0 开始，即 M1 先尝试发起 READ 事务。 */
-    s_motor_fsm_m1.cycle_start_tick_ms = HAL_GetTick();
-    s_motor_fsm_m1.read_transaction =
+    g_motor_fsm_m1.cycle_start_tick_ms = HAL_GetTick();
+    g_motor_fsm_m1.read_transaction =
         APP_LD2RS_READ_TRANSACTION_STATUS_SPEED;
-    s_motor_fsm_m1.phase = APP_LD2RS_TASK_PHASE_READ_REQ;
+    g_motor_fsm_m1.phase = APP_LD2RS_TASK_PHASE_READ_REQ;
 }
 
 

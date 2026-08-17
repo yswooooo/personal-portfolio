@@ -1,11 +1,10 @@
 /**
   ******************************************************************************
-  * @file    motor_ctrl.c
-  * @brief   电机控制实现 — 线性初始化 + 周期读写
+  * @file    app_chassis_motor_ctrl.c
+  * @brief   LD2-RS 初始化、差速解算和遥控映射实现
   *
-  * @details Init 顺序配置速度模式/速度源/加减速，然后写零速。
-  *          Task 周期读状态，若使能则写目标速度，定时打印监控。
-  *          所有读写结果均通过 USART1 输出，失败时打印具体错误码。
+  * @details Init 顺序配置速度模式、速度源、加减速和零速目标；
+  *          运行期非阻塞读写由 app_ld2rs_task 模块负责。
   ******************************************************************************
   */
 
@@ -33,12 +32,12 @@ motor_ctrl_param_t g_ld2rs_motor_param_m2 = {
 };
 
 /**
-  * @brief  写寄存器并打印结果
-  * @param  motor_ctrl    电机控制上下文
-  * @param  reg_addr 寄存器地址
-  * @param  reg_value 写入值
-  * @param  reg_name  寄存器名称 (用于打印)
-  * @retval modbus_rtu_status_t
+  * @brief 通过电机控制上下文写入一个 LD2-RS 寄存器。
+  * @param[in] motor_ctrl 电机控制上下文。
+  * @param[in] reg_addr   寄存器地址。
+  * @param[in] reg_value  待写入的 16 bit 寄存器值。
+  * @param[in] reg_name   寄存器名称；当前仅为调用侧保留的调试标识。
+  * @return 底层 ld2_motor_write_reg() 返回的 Modbus RTU 状态。
   */
 static modbus_rtu_status_t app_chassis_ld2rs_motor_ctrl_write_reg(ld2rs_motor_ctrl_t *motor_ctrl,
                                      uint16_t reg_addr,
@@ -53,13 +52,7 @@ static modbus_rtu_status_t app_chassis_ld2rs_motor_ctrl_write_reg(ld2rs_motor_ct
 
 /* Exported ld2rs functions --------------------------------------------------------*/
 
-/**
-  * @brief  初始化电机控制 — 一次性配置
-  * @param  motor_ctrl         电机控制上下文指针
-  * @param  ld2_motor      LD2-RS 设备句柄
-  * @param  ref_speed_rpm 初始目标转速 (rpm)
-  * @param  motor_id   电机编号 (1 或 2), 用于打印前缀
-  */
+/** @copydoc app_chassis_ld2rs_motor_ctrl_init */
 void app_chassis_ld2rs_motor_ctrl_init(ld2rs_motor_ctrl_t *motor_ctrl, ld2_motor_handle_t *ld2_motor,
                     int16_t ref_speed_rpm, uint8_t motor_id)
 {
@@ -121,12 +114,7 @@ void app_chassis_ld2rs_motor_ctrl_init(ld2rs_motor_ctrl_t *motor_ctrl, ld2_motor
     motor_ctrl->is_accel_decel_ok = (status == MODBUS_RTU_OK) ? 1u : 0u;
 }
 
-/**
-  * @brief  硬写入速度环 PI 参数, 读回验证
-  * @param  dev    LD2-RS 设备句柄
-  * @param  motor_param  电机控制参数
-  * @note   阻塞写入+读回, 仅在 init 阶段使用
-  */
+/** @copydoc app_chassis_ld2rs_motor_ctrl_pi_init */
 void app_chassis_ld2rs_motor_ctrl_pi_init(ld2_motor_handle_t *dev, const motor_ctrl_param_t *motor_param)
 {
     uint16_t reg_value;
@@ -162,9 +150,7 @@ void app_chassis_ld2rs_motor_ctrl_pi_init(ld2_motor_handle_t *dev, const motor_c
     }
 }
 
-/**
-  * @brief  读回驱动器参数 (仅读不写), 存入 LD2RS 设备句柄
-  */
+/** @copydoc app_chassis_ld2rs_motor_ctrl_param_read_back */
 void app_chassis_ld2rs_motor_ctrl_param_read_back(ld2_motor_handle_t *dev)
 {
     uint16_t reg_value;
@@ -180,16 +166,7 @@ void app_chassis_ld2rs_motor_ctrl_param_read_back(ld2_motor_handle_t *dev)
 
 /* Exported diff chassis functions ----------------------------------------------*/
 
-/**
-  * @brief  二轮差速模型 — 线速度+角速度 → 左右轮转速
-  * @param  linear_velocity_mps   底盘线速度 (m/s)
-  * @param  angular_velocity_radps  底盘角速度 (rad/s, 逆时针为正)
-  * @param  left_rpm_out     左轮转速输出 (rpm)
-  * @param  right_rpm_out    右轮转速输出 (rpm)
-  *
-  * @note   解算后用 app_diff_drive_limit_rpm 等比例限幅，
-  *         保证转弯半径不变、仅压缩整体速度。
-  */
+/** @copydoc app_diff_drive_compute */
 void app_diff_drive_compute(const float *linear_velocity_mps, const float *angular_velocity_radps,
                        int16_t *left_rpm_out, int16_t *right_rpm_out)
 {
@@ -203,7 +180,8 @@ void app_diff_drive_compute(const float *linear_velocity_mps, const float *angul
     right_rpm = (*linear_velocity_mps) * 1000.0f + (*angular_velocity_radps) * half_track_mm;
 
     /* 2. 线速度 → 转速 (rpm) */
-    scale = (60.0f * APP_CHASSIS_GEAR_RATIO) / (2.0f * 3.14159265f * APP_CHASSIS_WHEEL_RADIUS_MM);
+    scale = (60.0f * APP_CHASSIS_GEAR_RATIO)
+        / (APP_MATH_TWO_PI_F * APP_CHASSIS_WHEEL_RADIUS_MM);
     left_rpm  *= scale;
     right_rpm *= scale;
 
@@ -215,16 +193,7 @@ void app_diff_drive_compute(const float *linear_velocity_mps, const float *angul
     *right_rpm_out = (int16_t)right_rpm * APP_MOTOR_CTRL_M2_POLARITY;
 }
 
-/**
-  * @brief  等比例限幅 — 任一超限则两轮同步缩放，保持转弯半径不变
-  * @param  left_rpm_out   左轮转速指针 (输入兼输出)
-  * @param  right_rpm_out  右轮转速指针 (输入兼输出)
-  * @param  max_rpm    最大允许转速绝对值 (rpm)
-  *
-  * @note   只做等比例缩放，不单独裁剪某一边。
-  *         例：左=2000, 右=3000, max=1500
-  *         → max_abs=3000, scale=0.5 → 左=1000, 右=1500 ✓ 转弯半径不变
-  */
+/** @copydoc app_diff_drive_limit_rpm */
 void app_diff_drive_limit_rpm(float *left_rpm_out, float *right_rpm_out, float max_rpm)
 {
     float max_abs_rpm;   /* 两轮绝对值最大值 */
@@ -256,14 +225,11 @@ void app_diff_drive_limit_rpm(float *left_rpm_out, float *right_rpm_out, float m
     }
 }
 /* Exported steering wheel functions ----------------------------------------------*/
-//TODO 舵轮（CAN+协议+APP解码）
+
 
 /* Exported RC business functions ----------------------------------------------*/
 
-/**
-  * @brief  掉线检测 — >200ms 无帧则置 lost_flag = 1
-  * @param  channels 遥控通道数据指针
-  */
+/** @copydoc app_rc_channels_check_lost */
 void app_rc_channels_check_lost(RC_Channels_t *channels)
 {
     channels->now_tick = HAL_GetTick();
@@ -274,11 +240,7 @@ void app_rc_channels_check_lost(RC_Channels_t *channels)
     }
 }
 
-/**
-  * @brief  滤波后的遥控模拟通道映射为底盘速度指令
-  * @param  filter  滤波后的遥控模拟通道
-  * @param  command 底盘速度指令输出
-  */
+/** @copydoc app_diff_chassis_motor_ctrl_rc_map_to_chassis */
 void app_diff_chassis_motor_ctrl_rc_map_to_chassis(const RC_Filter_t *filter, RC_ChassisCmd_t *command)
 {
     if (BSP_RC_STICK_IN_DEADZONE(filter->ch_rx, filter->ch_ry)) {
@@ -289,7 +251,7 @@ void app_diff_chassis_motor_ctrl_rc_map_to_chassis(const RC_Filter_t *filter, RC
 
     /* 仅输出摇杆归一化方向量 [-1, 1], 物理速度由油门决定 */
     command->fLinearVel  = filter->ch_rx / (float)BSP_RC_STICK_MAX;
-    command->fAngularVel = (APP_CHASSIS_CMD_POLARITY) * filter->ch_ry / (float)BSP_RC_STICK_MAX;
+    command->fAngularVel = APP_CHASSIS_CMD_POLARITY * filter->ch_ry / (float)BSP_RC_STICK_MAX;
 }
 
 

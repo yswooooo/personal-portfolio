@@ -11,6 +11,14 @@
 #ifndef APP_CONFIG_H
 #define APP_CONFIG_H
 
+/* 通用数学常量 -------------------------------------------------------------*/
+
+/** @brief 单精度圆周率 */
+#define APP_MATH_PI_F                         (3.14159265f)
+
+/** @brief 单精度 2π */
+#define APP_MATH_TWO_PI_F                     (2.0f * APP_MATH_PI_F)
+
 /* LD2-RS 通信参数 -----------------------------------------------------------*/
 
 /** @brief 电机1 Modbus 站号 (与驱动器 Pr5.28 一致) */
@@ -115,8 +123,8 @@
 /** @brief 齿轮减速比 — 电机:车轮 = 20:1 */
 #define APP_CHASSIS_GEAR_RATIO                  20.0f
 
-/** @brief  差速轮解算极性控制 */
-#define APP_CHASSIS_CMD_POLARITY    -1
+/** @brief 遥控角速度方向极性；RC 层已统一为左正，因此保持正号 */
+#define APP_CHASSIS_CMD_POLARITY    (1)
 
 /** @brief 电机方向极性  */
 #define APP_MOTOR_CTRL_M1_POLARITY                 1
@@ -125,7 +133,7 @@
 /** @brief 底盘物理最大线速度 (m/s): v_max = RPM × 2π × R / (Gear × 60) */
 #define APP_CHASSIS_MAX_LINEAR_VEL_MPS \
     ((float)(APP_CHASSIS_SPEED_LIMIT_RPM) / (float)(APP_CHASSIS_GEAR_RATIO) \
-     * 2.0f * 3.14159265f * (APP_CHASSIS_WHEEL_RADIUS_MM) / 60000.0f)
+     * APP_MATH_TWO_PI_F * (APP_CHASSIS_WHEEL_RADIUS_MM) / 60000.0f)
 
 /** @brief 底盘物理最大角速度 (rad/s): ω_max = 2 × v_max / (Track / 1000) */
 #define APP_CHASSIS_MAX_ANGULAR_VEL_RPS \
